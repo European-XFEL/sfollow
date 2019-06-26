@@ -3,6 +3,7 @@ import os
 import re
 import select
 from subprocess import run, PIPE
+import sys
 
 def get_job_info(job_id):
     out = run(['scontrol', 'show', 'job', str(job_id)],
@@ -71,12 +72,15 @@ def multi_tail_fhs(fhs):
                 if not chunk: break
                 print(chunk, end='')
 
-def main():
-    import sys
-    job_id = sys.argv[1]
-    job_info = get_job_info(sys.argv[1])
+
+def sfollow(job_id):
+    job_info = get_job_info(job_id)
     paths = get_std_streams(job_info)
     multi_tail(paths)
+
+
+def main():
+    sfollow(sys.argv[1])
 
 if __name__ == '__main__':
     main()
