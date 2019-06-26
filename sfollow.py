@@ -6,6 +6,7 @@ from subprocess import run, PIPE
 import sys
 
 def get_job_info(job_id):
+    """Return a dict of job info from 'scontrol show job'"""
     out = run(['scontrol', 'show', 'job', str(job_id)],
               stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True)
 
@@ -14,6 +15,10 @@ def get_job_info(job_id):
 
 
 def get_std_streams(job_info):
+    """Get a list of paths for stdout & stderr
+
+    If they are the same file, only keep one.
+    """
     paths = []
     if 'StdOut' in job_info:
         paths.append(job_info['StdOut'])
@@ -27,6 +32,10 @@ def get_std_streams(job_info):
     return paths
 
 def multi_tail(paths):
+    """Follow data written to any of a list of files
+
+    Like 'tail -f' with multiple files.
+    """
     if not paths:
         print("No files to follow")
         return
@@ -54,13 +63,14 @@ def multi_tail(paths):
     print()
 
 def multi_tail_fhs(fhs):
-   poller = select.poll()
-   for fh in fhs:
+    """Follow multiple non-blocking file handles"""
+    poller = select.poll()
+    for fh in fhs:
        poller.register(fh, select.POLLIN | select.POLLPRI)
 
-   fd_to_fh = {fh.fileno(): fh for fh in fhs}
+    fd_to_fh = {fh.fileno(): fh for fh in fhs}
 
-   while True:
+    while True:
        for fd, _ in poller.poll():
            fh = fd_to_fh[fd]
            # Read all available data from this file handle
@@ -74,6 +84,7 @@ def multi_tail_fhs(fhs):
 
 
 def sfollow(job_id):
+    """Follow the output from a SLURM batch job"""
     job_info = get_job_info(job_id)
     paths = get_std_streams(job_info)
     multi_tail(paths)
