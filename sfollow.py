@@ -1,5 +1,4 @@
 from contextlib import ExitStack
-import io
 import os
 import re
 import select
