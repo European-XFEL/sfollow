@@ -83,15 +83,18 @@ def multi_tail_fhs(fhs):
                 print(chunk, end='')
 
 
-def sfollow(job_id):
+def sfollow(job_ids):
     """Follow the output from a SLURM batch job"""
-    job_info = get_job_info(job_id)
-    paths = get_std_streams(job_info)
-    multi_tail(paths)
+    all_paths = []
+    for job_id in job_ids:
+        job_info = get_job_info(job_id)
+        paths = get_std_streams(job_info)
+        all_paths.extend(paths)
+    multi_tail(all_paths)
 
 
 def main():
-    sfollow(sys.argv[1])
+    sfollow(sys.argv[1:])
 
 if __name__ == '__main__':
     main()
