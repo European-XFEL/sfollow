@@ -1,9 +1,12 @@
+"""Follow the output of a Slurm batch job"""
 from contextlib import ExitStack
 import os
 import re
 import select
 from subprocess import run, PIPE
 import sys
+
+__version__ = '0.1'
 
 def get_job_info(job_id):
     """Return a dict of job info from 'scontrol show job'"""
