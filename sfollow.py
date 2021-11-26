@@ -95,7 +95,10 @@ def my_last_job():
     # --sort=-V sorts by submission time (descending)
     res = run(['squeue', '--me', '--noheader', '--format=%i %j', '--sort=-V'],
               stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True)
-    return res.stdout.splitlines()[0].strip().split(maxsplit=1)
+    my_jobs = res.stdout.splitlines()
+    if not my_jobs:
+        raise Exception("You have no jobs running")
+    return my_jobs[0].strip().split(maxsplit=1)
 
 
 def main():
