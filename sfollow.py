@@ -90,8 +90,21 @@ def sfollow(job_id):
     multi_tail(paths)
 
 
+def my_last_job():
+    # '--format=%i %j' gives job IDs & names
+    # --sort=-V sorts by submission time (descending)
+    res = run(['squeue', '--me', '--noheader', '--format=%i %j', '--sort=-V'],
+              stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True)
+    return res.stdout.splitlines()[0].strip().split(maxsplit=1)
+
+
 def main():
-    sfollow(sys.argv[1])
+    if len(sys.argv) >= 2:
+        job_id = sys.argv[1]
+    else:
+        job_id, job_name = my_last_job()
+        print(f"Following your most recent job: {job_id} ({job_name})")
+    sfollow(job_id)
 
 if __name__ == '__main__':
     main()
