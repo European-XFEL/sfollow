@@ -1,10 +1,12 @@
 """Follow the output of a Slurm batch job"""
-from contextlib import ExitStack
+
 import os
 import re
 import select
-from subprocess import run, PIPE
 import sys
+import time
+from contextlib import ExitStack
+from subprocess import run, PIPE
 
 __version__ = '0.1'
 
@@ -89,6 +91,15 @@ def multi_tail_fhs(fhs):
 def sfollow(job_id):
     """Follow the output from a SLURM batch job"""
     job_info = get_job_info(job_id)
+
+    spinner = '|/-\\'
+    i = 0
+    while job_info['JobState'] == 'PENDING':
+        print(f"\r{spinner[i]} job {job_id} is pending ...")
+        i = (i + 1) % len(spinner)
+        time.sleep(2)
+        job_info = get_job_info(job_id)
+
     paths = get_std_streams(job_info)
     multi_tail(paths)
 
