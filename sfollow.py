@@ -95,7 +95,7 @@ def sfollow(job_id):
     spinner = '|/-\\'
     i = 0
     while job_info['JobState'] == 'PENDING':
-        print(f"\r{spinner[i]} job {job_id} is pending ...")
+        print(f"\r{spinner[i]} job {job_id} is pending ...", end="")
         i = (i + 1) % len(spinner)
         time.sleep(2)
         job_info = get_job_info(job_id)
