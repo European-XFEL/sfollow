@@ -4,7 +4,6 @@ import os
 import re
 import select
 import sys
-import time
 from contextlib import ExitStack
 from subprocess import run, PIPE
 
@@ -88,20 +87,14 @@ def multi_tail_fhs(fhs):
                 print(chunk, end='')
 
 
-def sfollow(job_id):
+def sfollow(job_ids):
     """Follow the output from a SLURM batch job"""
-    job_info = get_job_info(job_id)
-
-    spinner = '|/-\\'
-    i = 0
-    while job_info['JobState'] == 'PENDING':
-        print(f"\r{spinner[i]} job {job_id} is pending ...", end="")
-        i = (i + 1) % len(spinner)
-        time.sleep(2)
+    all_paths = []
+    for job_id in job_ids:
         job_info = get_job_info(job_id)
-
-    paths = get_std_streams(job_info)
-    multi_tail(paths)
+        paths = get_std_streams(job_info)
+        all_paths.extend(paths)
+    multi_tail(all_paths)
 
 
 def my_last_job():
@@ -117,11 +110,12 @@ def my_last_job():
 
 def main():
     if len(sys.argv) >= 2:
-        job_id = sys.argv[1]
+        job_ids = sys.argv[1:]
     else:
         job_id, job_name = my_last_job()
+        job_ids = [job_id]
         print(f"Following your most recent job: {job_id} ({job_name})")
-    sfollow(job_id)
+    sfollow(job_ids)
 
 if __name__ == '__main__':
     main()
