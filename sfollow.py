@@ -49,7 +49,8 @@ async def watch_jobs(job_ids, nursery):
         if state not in STATES_NOT_STARTED:
             info = get_job_info(job_id)
             for path in get_std_streams(info):
-                nursery.start_soon(tail_log, path, job_id)
+                cscope = nursery.start(tail_log, path)
+                tail_cancels[job_id].append(cscope)
 
     spinner = '|/-\\'
     spinner_i = 0
