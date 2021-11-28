@@ -137,7 +137,7 @@ def get_std_streams(job_info):
         paths.append(job_info['StdErr'])
 
     if len(paths) == 2 and os.path.samefile(paths[0],  paths[1]):
-        print("Stdout & stderr in the same file")
+        # Stdout & stderr in the same file
         del paths[1]
 
     return paths
@@ -168,7 +168,7 @@ def main():
     else:
         job_id, job_name = my_last_job()
         job_ids = [job_id]
-        print(f"Following your most recent job: {job_id} ({job_name})")
+        print(f"[sfollow] Following your most recent job: {job_id} ({job_name})")
     trio.run(sfollow, job_ids)
 
 if __name__ == '__main__':
