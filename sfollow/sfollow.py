@@ -62,8 +62,8 @@ async def watch_jobs(job_ids, nursery):
                 for cscope in tail_cancels.pop(job_id):
                     cscope.cancel()
 
-                # Checkpoint - let tail tasks process any final output
-                await trio.sleep(0)
+                # Fudge - hopefully final output will show before 'finished' msg
+                await trio.sleep(0.01)
                 msg(f'Job {job_id} finished ({fmt_state(new_state)})')
 
             states[job_id] = new_state
