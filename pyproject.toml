@@ -8,6 +8,7 @@ authors = [{name = "European XFEL GmbH", email = "da-support@xfel.eu"}]
 readme = "README.rst"
 license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: BSD License"]
+dependencies = ["trio"]
 dynamic = ["version", "description"]
 
 [project.urls]

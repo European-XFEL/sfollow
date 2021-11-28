@@ -1,13 +1,118 @@
 """Follow the output of a Slurm batch job"""
 
+import codecs
 import os
 import re
-import select
 import sys
-from contextlib import ExitStack
+from collections import defaultdict
 from subprocess import run, PIPE
 
+import trio
+
 __version__ = '0.1'
+
+
+STATES_FINISHED = {  # https://slurm.schedmd.com/squeue.html#lbAG
+    'BOOT_FAIL',  'CANCELLED', 'COMPLETED',  'DEADLINE', 'FAILED',
+    'NODE_FAIL', 'OUT_OF_MEMORY', 'PREEMPTED', 'SPECIAL_EXIT', 'TIMEOUT',
+}
+STATES_NOT_STARTED = {'PENDING', 'CONFIGURING'}
+
+def job_states(job_ids):
+    res = run([
+        'squeue', '--noheader', '--format=%i %T', '--jobs', ','.join(job_ids)
+    ], stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True)
+    return dict([l.strip().partition(' ')[::2] for l in res.stdout.splitlines()])
+
+def fmt_jobs(job_ids):
+    if len(job_ids) == 1:
+        return f"Job {job_ids[0]}"
+    elif len(job_ids) <= 3:
+        return f"Jobs {','.join(job_ids)}"
+    else:
+        return f"{len(job_ids)} jobs"
+
+def fmt_state(state):
+    red, green, reset = '\x1b[31m', '\x1b[32m', '\x1b[0m'
+    if state == 'COMPLETED':
+        return f'{green}{state}{reset}'
+    else:  # For now, treat finishing any other way as undesirable
+        return f'{red}{state}{reset}'
+
+
+async def watch_jobs(job_ids, nursery):
+    states = job_states(job_ids)
+    tail_cancels = defaultdict(list)
+
+    for job_id, state in states.items():
+        if state not in STATES_NOT_STARTED:
+            info = get_job_info(job_id)
+            for path in get_std_streams(info):
+                nursery.start_soon(tail_log, path, job_id)
+
+    spinner = '|/-\\'
+    spinner_i = 0
+
+    while True:
+        job_ids_unfinished = [
+            j for (j, s) in states.items() if s not in STATES_FINISHED
+        ]
+        if not job_ids_unfinished:
+            break
+
+        if all(st in STATES_NOT_STARTED for st in states.values()):
+            print(
+                f"[sfollow] {spinner[spinner_i]} Waiting for {fmt_jobs(job_ids)} "
+                "to start", end='\r'
+            )
+            spinner_i = (spinner_i + 1) % len(spinner)
+
+        for job_id, new_state in job_states(job_ids_unfinished).items():
+            started = new_state not in STATES_NOT_STARTED
+            if started and states[job_id] in STATES_NOT_STARTED:
+                # Job started since the last check
+                info = get_job_info(job_id)
+                print(f"[sfollow] Job {job_id} ({info.get('JobName', '')}) started")
+                for i, path in enumerate(get_std_streams(info)):
+                    cscope = nursery.start(tail_log, path, True)
+                    tail_cancels[job_id].append(cscope)
+
+            finished = new_state in STATES_FINISHED
+            if finished and states[job_id] not in STATES_FINISHED:
+                # Job finished since the last check
+                for cscope in tail_cancels.pop(job_id):
+                    cscope.cancel()
+
+                # Checkpoint - let tail tasks process any final output
+                await trio.sleep(0)
+                print(f'[sfollow] Job {job_id} finished ({fmt_state(new_state)})')
+
+            states[job_id] = new_state
+
+        await trio.sleep(2)
+
+
+async def tail_log(path, newly_started=False, *, task_status=trio.TASK_STATUS_IGNORED):
+    with open(path, 'rb') as fh:
+        if not newly_started and os.stat(fh.fileno()).st_size > 512:
+            fh.seek(-512, os.SEEK_END)
+
+        sr = codecs.getreader('utf-8')(fh, 'replace')
+
+        with trio.CancelScope() as cscope:
+            task_status.started(cscope)
+
+            while True:
+                for line in sr:
+                    print(line)
+                await trio.sleep(0.5)
+
+        # The Slurm job has finished - this should catch any final output
+        # Not unreachable, see https://youtrack.jetbrains.com/issue/PY-34484
+        # noinspection PyUnreachableCode
+        for line in sr:
+            print(line)
+
 
 def get_job_info(job_id):
     """Return a dict of job info from 'scontrol show job'"""
@@ -35,66 +140,13 @@ def get_std_streams(job_info):
 
     return paths
 
-def multi_tail(paths):
-    """Follow data written to any of a list of files
 
-    Like 'tail -f' with multiple files.
-    """
-    if not paths:
-        print("No files to follow")
-        return
-
-    fhs = []
-    initial_lines = []
-    with ExitStack() as stack:
-        for path in paths:
-            print("Following", path)
-            fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
-            if os.stat(fd).st_size > 512:
-                os.lseek(fd, -512, os.SEEK_END)
-            fh = open(fd, encoding='utf-8', errors='replace')
-            initial_lines.extend(fh.readlines()[-5:])
-            fhs.append(stack.enter_context(fh))
-        print()
-
-        for line in initial_lines:
-            print(line, end='')
-
-        try:
-            multi_tail_fhs(fhs)
-        except KeyboardInterrupt:
-            pass
-    print()
-
-def multi_tail_fhs(fhs):
-    """Follow multiple non-blocking file handles"""
-    poller = select.poll()
-    for fh in fhs:
-       poller.register(fh, select.POLLIN | select.POLLPRI)
-
-    fd_to_fh = {fh.fileno(): fh for fh in fhs}
-
-    while True:
-       for fd, _ in poller.poll():
-           fh = fd_to_fh[fd]
-           # Read all available data from this file handle
-           while True:
-                try:
-                    chunk = fh.read(1024)
-                except BlockingIOError:
-                    break
-                if not chunk: break
-                print(chunk, end='')
-
-
-def sfollow(job_ids):
+async def sfollow(job_ids):
     """Follow the output from a SLURM batch job"""
-    all_paths = []
-    for job_id in job_ids:
-        job_info = get_job_info(job_id)
-        paths = get_std_streams(job_info)
-        all_paths.extend(paths)
-    multi_tail(all_paths)
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(watch_jobs, job_ids, nursery)
+    # The nursery waits for all child tasks to finish, which should happen
+    # shortly after the Slurm jobs in question finish.
 
 
 def my_last_job():
@@ -115,7 +167,7 @@ def main():
         job_id, job_name = my_last_job()
         job_ids = [job_id]
         print(f"Following your most recent job: {job_id} ({job_name})")
-    sfollow(job_ids)
+    trio.run(sfollow, job_ids)
 
 if __name__ == '__main__':
     main()
