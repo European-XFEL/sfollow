@@ -56,8 +56,7 @@ async def watch_jobs(job_ids, nursery):
                     cscope = await nursery.start(tail_log, path, True)
                     tail_cancels[job_id].append(cscope)
 
-            finished = new_state in STATES_FINISHED
-            if finished and states[job_id] not in STATES_FINISHED:
+            if new_state in STATES_FINISHED:
                 # Job finished since the last check
                 for cscope in tail_cancels.pop(job_id):
                     cscope.cancel()
