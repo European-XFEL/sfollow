@@ -39,8 +39,6 @@ async def watch_jobs(job_ids, nursery):
         job_ids_unfinished = [
             j for (j, s) in states.items() if s not in STATES_FINISHED
         ]
-        if not job_ids_unfinished:
-            break
 
         if all(st in STATES_NOT_STARTED for st in states.values()):
             spinner_msg(f"Waiting for {fmt_jobs(job_ids)} to start")
@@ -66,6 +64,9 @@ async def watch_jobs(job_ids, nursery):
                 msg(f'Job {job_id} finished ({fmt_state(new_state)})')
 
             states[job_id] = new_state
+
+        if all(st in STATES_FINISHED for st in states.values()):
+            break
 
         await trio.sleep(2)
 
