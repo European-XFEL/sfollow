@@ -20,7 +20,8 @@ STATES_NOT_STARTED = {'PENDING', 'CONFIGURING'}
 
 def job_states(job_ids):
     res = run([
-        'squeue', '--noheader', '--format=%i %T', '--jobs', ','.join(job_ids)
+        'squeue', '--noheader', '--format=%i %T', '--jobs', ','.join(job_ids),
+        '--states=all',
     ], stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True)
     return dict([l.strip().partition(' ')[::2] for l in res.stdout.splitlines()])
 
