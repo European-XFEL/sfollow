@@ -13,3 +13,6 @@ dynamic = ["version", "description"]
 
 [project.urls]
 Home = "https://github.com/European-XFEL/sfollow"
+
+[project.scripts]
+sfollow = "sfollow.sfollow:main"

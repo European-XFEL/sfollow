@@ -1,5 +1,3 @@
-"""Follow the output of a Slurm batch job"""
-
 import codecs
 import os
 import re
@@ -8,8 +6,6 @@ from collections import defaultdict
 from subprocess import run, PIPE
 
 import trio
-
-__version__ = '0.1'
 
 
 STATES_FINISHED = {  # https://slurm.schedmd.com/squeue.html#lbAG
