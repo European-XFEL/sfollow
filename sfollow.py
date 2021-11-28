@@ -49,7 +49,7 @@ async def watch_jobs(job_ids, nursery):
         if state not in STATES_NOT_STARTED:
             info = get_job_info(job_id)
             for path in get_std_streams(info):
-                cscope = nursery.start(tail_log, path)
+                cscope = await nursery.start(tail_log, path)
                 tail_cancels[job_id].append(cscope)
 
     spinner = '|/-\\'
@@ -76,7 +76,7 @@ async def watch_jobs(job_ids, nursery):
                 info = get_job_info(job_id)
                 print(f"[sfollow] Job {job_id} ({info.get('JobName', '')}) started")
                 for i, path in enumerate(get_std_streams(info)):
-                    cscope = nursery.start(tail_log, path, True)
+                    cscope = await nursery.start(tail_log, path, True)
                     tail_cancels[job_id].append(cscope)
 
             finished = new_state in STATES_FINISHED
