@@ -105,14 +105,14 @@ async def tail_log(path, newly_started=False, *, task_status=trio.TASK_STATUS_IG
 
             while True:
                 for line in sr:
-                    print(line)
+                    print(line, end='')
                 await trio.sleep(0.5)
 
         # The Slurm job has finished - this should catch any final output
         # Not unreachable, see https://youtrack.jetbrains.com/issue/PY-34484
         # noinspection PyUnreachableCode
         for line in sr:
-            print(line)
+            print(line, end='')
 
 
 def get_job_info(job_id):
