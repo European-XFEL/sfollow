@@ -7,6 +7,8 @@ from subprocess import run, PIPE
 
 import trio
 
+from .terminal import msg, spinner_msg, clear_spinner, fmt_state, fmt_jobs
+
 
 STATES_FINISHED = {  # https://slurm.schedmd.com/squeue.html#lbAG
     'BOOT_FAIL',  'CANCELLED', 'COMPLETED',  'DEADLINE', 'FAILED',
@@ -21,21 +23,6 @@ def job_states(job_ids):
     ], stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True)
     return dict([l.strip().partition(' ')[::2] for l in res.stdout.splitlines()])
 
-def fmt_jobs(job_ids):
-    if len(job_ids) == 1:
-        return f"Job {job_ids[0]}"
-    elif len(job_ids) <= 3:
-        return f"Jobs {','.join(job_ids)}"
-    else:
-        return f"{len(job_ids)} jobs"
-
-def fmt_state(state):
-    red, green, reset = '\x1b[31m', '\x1b[32m', '\x1b[0m'
-    if state == 'COMPLETED':
-        return f'{green}{state}{reset}'
-    else:  # For now, treat finishing any other way as undesirable
-        return f'{red}{state}{reset}'
-
 
 async def watch_jobs(job_ids, nursery):
     states = job_states(job_ids)
@@ -48,9 +35,6 @@ async def watch_jobs(job_ids, nursery):
                 cscope = await nursery.start(tail_log, path)
                 tail_cancels[job_id].append(cscope)
 
-    spinner = '|/-\\'
-    spinner_i = 0
-
     while True:
         job_ids_unfinished = [
             j for (j, s) in states.items() if s not in STATES_FINISHED
@@ -59,18 +43,16 @@ async def watch_jobs(job_ids, nursery):
             break
 
         if all(st in STATES_NOT_STARTED for st in states.values()):
-            print(
-                f"[sfollow] {spinner[spinner_i]} Waiting for {fmt_jobs(job_ids)} "
-                "to start", end='\r'
-            )
-            spinner_i = (spinner_i + 1) % len(spinner)
+            spinner_msg(f"Waiting for {fmt_jobs(job_ids)} to start")
+        else:
+            clear_spinner()
 
         for job_id, new_state in job_states(job_ids_unfinished).items():
             started = new_state not in STATES_NOT_STARTED
             if started and states[job_id] in STATES_NOT_STARTED:
                 # Job started since the last check
                 info = get_job_info(job_id)
-                print(f"[sfollow] Job {job_id} ({info.get('JobName', '')}) started")
+                msg(f"Job {job_id} ({info.get('JobName', '')}) started")
                 for i, path in enumerate(get_std_streams(info)):
                     cscope = await nursery.start(tail_log, path, True)
                     tail_cancels[job_id].append(cscope)
@@ -83,7 +65,7 @@ async def watch_jobs(job_ids, nursery):
 
                 # Checkpoint - let tail tasks process any final output
                 await trio.sleep(0)
-                print(f'[sfollow] Job {job_id} finished ({fmt_state(new_state)})')
+                msg(f'Job {job_id} finished ({fmt_state(new_state)})')
 
             states[job_id] = new_state
 
@@ -164,7 +146,7 @@ def main():
     else:
         job_id, job_name = my_last_job()
         job_ids = [job_id]
-        print(f"[sfollow] Following your most recent job: {job_id} ({job_name})")
+        msg(f"Following your most recent job: {job_id} ({job_name})")
     trio.run(sfollow, job_ids)
 
 if __name__ == '__main__':
