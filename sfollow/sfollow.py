@@ -44,14 +44,13 @@ async def watch_jobs(job_ids, nursery):
 
         if all(st in STATES_NOT_STARTED for st in states.values()):
             spinner_msg(f"Waiting for {fmt_jobs(job_ids)} to start")
-        else:
-            clear_spinner()
 
         for job_id, new_state in job_states(job_ids_unfinished).items():
             started = new_state not in STATES_NOT_STARTED
             if started and states[job_id] in STATES_NOT_STARTED:
                 # Job started since the last check
                 info = get_job_info(job_id)
+                clear_spinner()
                 msg(f"Job {job_id} ({info.get('JobName', '')}) started")
                 for i, path in enumerate(get_std_streams(info)):
                     cscope = await nursery.start(tail_log, path, True)
