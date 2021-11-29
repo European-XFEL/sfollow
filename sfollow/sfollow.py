@@ -126,14 +126,14 @@ def my_last_job():
 
 
 def main():
-    if len(sys.argv) >= 2:
-        job_ids = sys.argv[1:]
-    else:
-        job_id, job_name = my_last_job()
-        job_ids = [job_id]
-        msg(f"Following your most recent job: {job_id} ({job_name})")
+    job_ids = sys.argv[1:]
 
     try:
+        if not job_ids:
+            job_id, job_name = my_last_job()
+            job_ids = [job_id]
+            msg(f"Following your most recent job: {job_id} ({job_name})")
+
         sfollow(job_ids)
     except (KeyboardInterrupt, UsageError) as e:
         clear_spinner()
