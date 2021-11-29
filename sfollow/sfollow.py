@@ -9,6 +9,10 @@ from subprocess import run, PIPE
 from .terminal import msg, spinner_msg, clear_spinner, fmt_state, fmt_jobs
 
 
+class UsageError(Exception):
+    pass
+
+
 STATES_FINISHED = {  # https://slurm.schedmd.com/squeue.html#lbAG
     'BOOT_FAIL',  'CANCELLED', 'COMPLETED',  'DEADLINE', 'FAILED',
     'NODE_FAIL', 'OUT_OF_MEMORY', 'PREEMPTED', 'SPECIAL_EXIT', 'TIMEOUT',
@@ -117,7 +121,7 @@ def my_last_job():
               stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True)
     my_jobs = res.stdout.splitlines()
     if not my_jobs:
-        raise Exception("You have no jobs running")
+        raise UsageError("You have no jobs running")
     return my_jobs[0].strip().split(maxsplit=1)
 
 
@@ -128,7 +132,13 @@ def main():
         job_id, job_name = my_last_job()
         job_ids = [job_id]
         msg(f"Following your most recent job: {job_id} ({job_name})")
-    sfollow(job_ids)
+
+    try:
+        sfollow(job_ids)
+    except (KeyboardInterrupt, UsageError) as e:
+        clear_spinner()
+        print(e)
+        return 1
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
