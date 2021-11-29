@@ -68,7 +68,7 @@ def sfollow(job_ids):
                 # Job finished since the last check
                 for fh in open_files.pop(job_id, ()):
                     # strip any trailing newline, let print() add one.
-                    print(fh.read().replace('utf-8', 'replace').rstrip('\n'))
+                    print(fh.read().decode('utf-8', 'replace').rstrip('\n'))
                     fh.close()
 
                 msg(f'Job {job_id} finished ({fmt_state(new_state)})')
