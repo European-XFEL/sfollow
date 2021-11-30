@@ -117,11 +117,13 @@ def get_std_streams(job_info):
 def my_last_job():
     # '--format=%i %j' gives job IDs & names
     # --sort=-V sorts by submission time (descending)
-    res = run(['squeue', '--me', '--noheader', '--format=%i %j', '--sort=-V'],
-              stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True)
+    res = run(
+        ['squeue', '--me', '--noheader', '--format=%i %j', '--sort=-V', '--states=all'],
+        stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True
+    )
     my_jobs = res.stdout.splitlines()
     if not my_jobs:
-        raise UsageError("You have no jobs running")
+        raise UsageError("You have no jobs running or recently finished")
     return my_jobs[0].strip().split(maxsplit=1)
 
 
