@@ -31,6 +31,17 @@ def sfollow(job_ids):
     states = job_states(job_ids)
     open_files = defaultdict(list)
 
+    def finished(jid, final_state):
+        # Job finished since the last check
+        for fh in open_files.pop(jid, ()):
+            # strip any trailing newline, let print() add one.
+            b = fh.read()
+            if b:
+                print(b.decode('utf-8', 'replace').rstrip('\n'))
+            fh.close()
+
+        msg(f'Job {jid} finished ({fmt_state(final_state)})')
+
     # Jobs already running before we started: jump to near the end, like tail -f
     for job_id, state in states.items():
         if state not in STATES_NOT_STARTED:
@@ -40,6 +51,9 @@ def sfollow(job_ids):
                 if os.stat(fh.fileno()).st_size > 512:
                     fh.seek(-512, os.SEEK_END)
                 open_files[job_id].append(fh)
+
+            if state in STATES_FINISHED:
+                finished(job_id, state)
 
     for i in itertools.count():
         for files in open_files.values():
@@ -69,15 +83,7 @@ def sfollow(job_ids):
                     open_files[job_id].append(open(path, 'rb'))
 
             if new_state in STATES_FINISHED:
-                # Job finished since the last check
-                for fh in open_files.pop(job_id, ()):
-                    # strip any trailing newline, let print() add one.
-                    b = fh.read()
-                    if b:
-                        print(b.decode('utf-8', 'replace').rstrip('\n'))
-                    fh.close()
-
-                msg(f'Job {job_id} finished ({fmt_state(new_state)})')
+                finished(job_id, new_state)
 
             states[job_id] = new_state
 
@@ -117,11 +123,13 @@ def get_std_streams(job_info):
 def my_last_job():
     # '--format=%i %j' gives job IDs & names
     # --sort=-V sorts by submission time (descending)
-    res = run(['squeue', '--me', '--noheader', '--format=%i %j', '--sort=-V'],
-              stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True)
+    res = run(
+        ['squeue', '--me', '--noheader', '--format=%i %j', '--sort=-V', '--states=all'],
+        stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True
+    )
     my_jobs = res.stdout.splitlines()
     if not my_jobs:
-        raise UsageError("You have no jobs running")
+        raise UsageError("You have no jobs running or recently finished")
     return my_jobs[0].strip().split(maxsplit=1)
 
 
