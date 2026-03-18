@@ -111,10 +111,10 @@ def get_std_streams(job_info):
     If they are the same file, only keep one.
     """
     paths = []
-    if 'StdOut' in job_info:
-        paths.append(job_info['StdOut'])
-    if 'StdErr' in job_info:
-        paths.append(job_info['StdErr'])
+    if so := job_info.get('StdOut', ''):
+        paths.append(so)
+    if se := job_info.get('StdErr', ''):
+        paths.append(se)
 
     if len(paths) == 2 and os.path.samefile(paths[0],  paths[1]):
         # Stdout & stderr in the same file
